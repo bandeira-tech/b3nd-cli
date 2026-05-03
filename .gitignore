@@ -1,0 +1,9 @@
+node_modules/
+dist/
+npm/
+.env
+.env.local
+*.log
+.DS_Store
+deno.lock
+bnd.bundle.js
