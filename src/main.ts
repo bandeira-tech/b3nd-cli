@@ -11,7 +11,6 @@ import {
   health,
   list,
   read,
-  send,
   serverKeysEnv,
   showHelp,
   upload,
@@ -23,6 +22,8 @@ import {
   configSetRig,
   configShow,
 } from "./commands/config.ts";
+import { receive, send } from "./commands/send.ts";
+import { status } from "./commands/status.ts";
 import {
   nodeConfigGet,
   nodeConfigPush,
@@ -49,6 +50,20 @@ function parseVerboseFlag(
 }
 
 /**
+ * Parse --rig flag from args (universal override for the resolved rig)
+ */
+function parseRigFlag(
+  args: string[],
+): { args: string[]; rig?: string } {
+  const index = args.findIndex((a) => a === "--rig");
+  if (index === -1 || !args[index + 1]) return { args };
+  return {
+    args: args.filter((_, i) => i !== index && i !== index + 1),
+    rig: args[index + 1],
+  };
+}
+
+/**
  * Main CLI entry point
  */
 async function main(): Promise<void> {
@@ -59,7 +74,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { args: cleanArgs, verbose } = parseVerboseFlag(args);
+  const { args: afterVerbose, verbose } = parseVerboseFlag(args);
+  const { args: cleanArgs, rig: rigOverride } = parseRigFlag(afterVerbose);
   const command = cleanArgs[0];
   const subcommand = cleanArgs[1];
 
@@ -124,7 +140,23 @@ async function main(): Promise<void> {
       }
 
       case "send": {
-        await send(cleanArgs.slice(1), verbose);
+        if (!cleanArgs[1]) {
+          throw new Error("Usage: bnd send <file|->");
+        }
+        await send({ source: cleanArgs[1], rig: rigOverride, verbose });
+        break;
+      }
+
+      case "receive": {
+        if (!cleanArgs[1]) {
+          throw new Error("Usage: bnd receive <file|->");
+        }
+        await receive({ source: cleanArgs[1], rig: rigOverride, verbose });
+        break;
+      }
+
+      case "status": {
+        await status({ rig: rigOverride, verbose });
         break;
       }
 
