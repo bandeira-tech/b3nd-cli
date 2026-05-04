@@ -1,13 +1,18 @@
 /**
- * `bnd send` — push ready outputs through the configured rig.
+ * `bnd send` / `bnd receive` — push ready outputs through the configured rig.
  *
- *   bnd send <file>     # JSON: [string, any] or [string, any][]
- *   bnd send -          # read JSON from stdin
+ *   bnd send <file>     # JSON file: [string, any] or [string, any][]
+ *   bnd send -          # stdin: auto-detects NDJSON streaming vs single-JSON
+ *   bnd receive ...     # symmetric, calls rig.receive instead of rig.send
+ *
+ * For stdin, NDJSON is detected by attempting to parse the first
+ * non-empty line as standalone JSON. If it parses, each line is sent
+ * as it arrives — pipe-friendly for `bnd observe --json | bnd receive -`.
  */
 
 import { loadConfig } from "../config.ts";
 import { loadRig } from "../rig-loader.ts";
-import { readOutputs } from "../io.ts";
+import { streamOutputs } from "../io.ts";
 import { createLogger } from "../logger.ts";
 
 interface ResultShape {
@@ -37,8 +42,6 @@ async function dispatch(
   opts: { source: string; rig?: string; verbose?: boolean },
 ): Promise<void> {
   const logger = createLogger(opts.verbose ?? false);
-  const outputs = await readOutputs(opts.source);
-  logger.info(`Loaded ${outputs.length} output(s) from ${opts.source}`);
 
   const config = await loadConfig();
   const { rig, source } = await loadRig({
@@ -47,20 +50,27 @@ async function dispatch(
   });
   logger.info(`Rig: ${source.input} (${source.origin})`);
 
-  const handle = (rig as unknown as Record<string, (o: unknown[]) => unknown>)[
+  const fn = (rig as unknown as Record<string, (o: unknown[]) => unknown>)[
     method
-  ](outputs);
-  const results = (await handle) as ResultShape[];
+  ];
 
+  let total = 0;
   let failed = 0;
-  for (const r of results) {
-    const uri = r.uri ?? "?";
-    if (r.accepted) {
-      console.log(`✓ ${uri}`);
-    } else {
-      console.error(`✗ ${uri} — ${r.error ?? "rejected"}`);
-      failed++;
+
+  for await (const batch of streamOutputs(opts.source)) {
+    total += batch.length;
+    const results = (await fn(batch)) as ResultShape[];
+    for (const r of results) {
+      const uri = r.uri ?? "?";
+      if (r.accepted) {
+        console.log(`✓ ${uri}`);
+      } else {
+        console.error(`✗ ${uri} — ${r.error ?? "rejected"}`);
+        failed++;
+      }
     }
   }
+
+  logger.info(`${total} output(s) total, ${failed} failed`);
   if (failed > 0) Deno.exit(1);
 }
