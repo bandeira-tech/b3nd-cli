@@ -26,7 +26,9 @@ export async function status(opts: {
   });
   logger.info(`Rig: ${source.input} (${source.origin})`);
 
-  const result = (await rig.status()) as StatusShape;
+  const result = await (rig as unknown as {
+    status: () => Promise<StatusShape>;
+  }).status();
 
   const icon = result.status === "healthy"
     ? "✓"
