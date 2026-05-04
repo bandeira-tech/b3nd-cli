@@ -16,40 +16,17 @@ Deno.test("parseToml: empty input → empty config", () => {
   assertEquals(parseToml(""), {});
 });
 
-Deno.test("parseToml: each known key", () => {
+Deno.test("parseToml: rig key", () => {
   assertEquals(
     parseToml(`rig = "/path/to/rig.ts"`),
     { rig: "/path/to/rig.ts" },
   );
-  assertEquals(
-    parseToml(`node = "https://node.example.com"`),
-    { node: "https://node.example.com" },
-  );
-  assertEquals(
-    parseToml(`account = "/path/key"`),
-    { account: "/path/key" },
-  );
-});
-
-Deno.test("parseToml: all keys together", () => {
-  const content = `
-rig = "/r"
-node = "/n"
-account = "/a"
-encrypt = "true"
-`;
-  assertEquals(parseToml(content), {
-    rig: "/r",
-    node: "/n",
-    account: "/a",
-    encrypt: "true",
-  });
 });
 
 Deno.test("parseToml: ignores blank lines", () => {
   assertEquals(
-    parseToml(`\n\nrig = "/r"\n\n\nnode = "/n"\n\n`),
-    { rig: "/r", node: "/n" },
+    parseToml(`\n\nrig = "/r"\n\n`),
+    { rig: "/r" },
   );
 });
 
@@ -64,21 +41,16 @@ Deno.test("parseToml: tolerates extra whitespace around `=`", () => {
   assertEquals(parseToml(`rig    =   "/r"`), { rig: "/r" });
 });
 
-Deno.test("parseToml: encrypt accepts bare bool true/false", () => {
-  assertEquals(parseToml(`encrypt = true`), { encrypt: "true" });
-  assertEquals(parseToml(`encrypt = false`), { encrypt: "false" });
-});
-
-Deno.test("parseToml: unknown keys are ignored", () => {
+Deno.test("parseToml: unknown keys are ignored (incl. dropped legacy keys)", () => {
   assertEquals(
-    parseToml(`rig = "/r"\nfuture = "value"\n`),
+    parseToml(`rig = "/r"\nfuture = "value"\nnode = "/n"\nencrypt = "true"\n`),
     { rig: "/r" },
   );
 });
 
 Deno.test("parseToml: malformed lines are silently skipped", () => {
   // Hand-rolled parser doesn't error — it just keeps what matched
-  assertEquals(parseToml(`rig =\nnode = "/n"`), { node: "/n" });
+  assertEquals(parseToml(`rig =\nrig = "/r"`), { rig: "/r" });
 });
 
 // ── serializeToml ────────────────────────────────────────────────────────
@@ -87,12 +59,8 @@ Deno.test("serializeToml: empty config → empty string", () => {
   assertEquals(serializeToml({}), "");
 });
 
-Deno.test("serializeToml: rig appears first (sorts on top)", () => {
-  const out = serializeToml({ node: "/n", rig: "/r" });
-  // rig must appear before node in the output
-  const rigIdx = out.indexOf("rig");
-  const nodeIdx = out.indexOf("node");
-  assertEquals(rigIdx >= 0 && nodeIdx >= 0 && rigIdx < nodeIdx, true);
+Deno.test("serializeToml: rig key", () => {
+  assertEquals(serializeToml({ rig: "/r" }), `rig = "/r"\n`);
 });
 
 Deno.test("serializeToml: ends with single trailing newline", () => {
@@ -103,13 +71,12 @@ Deno.test("serializeToml: ends with single trailing newline", () => {
 
 // ── roundtrip ────────────────────────────────────────────────────────────
 
-Deno.test("roundtrip: parse(serialize(x)) === x for full configs", () => {
+Deno.test("roundtrip: parse(serialize(x)) === x", () => {
   const samples: BndConfig[] = [
     {},
     { rig: "/r" },
-    { rig: "/r", node: "/n" },
-    { rig: "/r", node: "/n", account: "/a", encrypt: "true" },
-    { encrypt: "false" },
+    { rig: "jsr:@me/rig" },
+    { rig: "https://example.com/rig.ts" },
   ];
   for (const x of samples) {
     assertEquals(parseToml(serializeToml(x)), x);
@@ -139,7 +106,7 @@ Deno.test("loadConfig: returns empty when file does not exist", async () => {
 
 Deno.test("saveConfig + loadConfig: roundtrip writes the right file", async () => {
   await withTempHome(async () => {
-    const cfg: BndConfig = { rig: "/r", node: "/n" };
+    const cfg: BndConfig = { rig: "/r" };
     await saveConfig(cfg);
 
     // The file should land at $HOME/.bnd/config.toml
@@ -150,18 +117,6 @@ Deno.test("saveConfig + loadConfig: roundtrip writes the right file", async () =
     assertEquals(onDisk, serializeToml(cfg));
 
     assertEquals(await loadConfig(), cfg);
-  });
-});
-
-Deno.test("updateConfig: merges a single key without losing others", async () => {
-  await withTempHome(async () => {
-    await saveConfig({ node: "/n", account: "/a" });
-    await updateConfig("rig", "/r");
-    assertEquals(await loadConfig(), {
-      node: "/n",
-      account: "/a",
-      rig: "/r",
-    });
   });
 });
 

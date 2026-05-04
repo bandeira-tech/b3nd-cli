@@ -1,19 +1,6 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-net
 
 import {
-  accountCreate,
-  confAccount,
-  confEncrypt,
-  confNode,
-  del,
-  deploy,
-  encryptCreate,
-  health,
-  serverKeysEnv,
-  showHelp,
-  upload,
-} from "./commands.ts";
-import {
   configEdit,
   configInit,
   configSetRig,
@@ -23,14 +10,47 @@ import { receive, send } from "./commands/send.ts";
 import { status } from "./commands/status.ts";
 import { read } from "./commands/read.ts";
 import { observe } from "./commands/observe.ts";
-import {
-  nodeConfigGet,
-  nodeConfigPush,
-  nodeEnv,
-  nodeKeygen,
-  nodeStatus,
-} from "./commands/node.ts";
-import { networkCreate, networkStatus, networkUp } from "./commands/network.ts";
+
+const HELP = `bnd — B3nd CLI (v0.3)
+
+A thin framework tool. Loads a user-defined rig module and uses it
+to send / read / observe / serve. No protocol or signing concerns —
+those belong in your rig module.
+
+Commands:
+  bnd send <file|->                Send ready outputs (rig.send)
+  bnd receive <file|->             Ingest ready outputs (rig.receive)
+  bnd read <uri> [<uri>...]        Read URIs (trailing slash → list)
+  bnd observe <pattern>            Subscribe to URI pattern (Ctrl+C to stop)
+  bnd status                       Show resolved rig health
+  bnd node ...                     (coming in v0.3 — host a rig over HTTP/gRPC/MCP)
+
+Config:
+  bnd config                       Show current config + resolved rig
+  bnd config init [<path>]         Scaffold a starter b3nd.rig.ts
+  bnd config rig <path|url>        Set the default rig
+  bnd config edit                  Open the resolved rig in $EDITOR
+
+Universal flags (work on any command):
+  -v, --verbose                    Verbose progress to stderr
+  --rig <path|url>                 Override the resolved rig for this run
+  --json                           Machine-friendly output (NDJSON for observe,
+                                   JSON array for read)
+
+Rig resolution order:
+  1. --rig <path|url>
+  2. ./b3nd.rig.ts in current directory
+  3. rig = "..." in ~/.bnd/config.toml
+
+Quickstart:
+  bnd config init
+  bnd config edit                  # point your rig at a real node
+  bnd status
+`;
+
+function showHelp(): void {
+  console.log(HELP);
+}
 
 /**
  * Parse universal flags. Strips them from args and returns the rest as
@@ -58,9 +78,6 @@ function parseFlags(args: string[]): ParsedFlags {
   return { args: positional, verbose, json, rig };
 }
 
-/**
- * Main CLI entry point
- */
 async function main(): Promise<void> {
   const args = Deno.args;
 
@@ -80,92 +97,15 @@ async function main(): Promise<void> {
 
   try {
     switch (command) {
-      case "account": {
-        if (!subcommand) {
-          throw new Error("Subcommand required. Usage: bnd account <create>");
-        }
-
-        if (subcommand === "create") {
-          await accountCreate(cleanArgs[2]);
-        } else {
-          throw new Error(`Unknown account subcommand: ${subcommand}`);
-        }
-        break;
-      }
-
-      case "encrypt": {
-        if (!subcommand) {
-          throw new Error("Subcommand required. Usage: bnd encrypt <create>");
-        }
-
-        if (subcommand === "create") {
-          await encryptCreate(cleanArgs[2]);
-        } else {
-          throw new Error(`Unknown encrypt subcommand: ${subcommand}`);
-        }
-        break;
-      }
-
-      case "conf": {
-        if (!subcommand) {
-          throw new Error(
-            "Subcommand required. Usage: bnd conf <node|account|encrypt> <value>",
-          );
-        }
-
-        if (subcommand === "node") {
-          if (!cleanArgs[2]) {
-            throw new Error("Node URL required. Usage: bnd conf node <url>");
-          }
-          await confNode(cleanArgs[2]);
-        } else if (subcommand === "account") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Account key path required. Usage: bnd conf account <path>",
-            );
-          }
-          await confAccount(cleanArgs[2]);
-        } else if (subcommand === "encrypt") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Encryption key path required. Usage: bnd conf encrypt <path>",
-            );
-          }
-          await confEncrypt(cleanArgs[2]);
-        } else {
-          throw new Error(`Unknown conf subcommand: ${subcommand}`);
-        }
-        break;
-      }
-
       case "send": {
-        if (!cleanArgs[1]) {
-          throw new Error("Usage: bnd send <file|->");
-        }
+        if (!cleanArgs[1]) throw new Error("Usage: bnd send <file|->");
         await send({ source: cleanArgs[1], rig: rigOverride, verbose });
         break;
       }
 
       case "receive": {
-        if (!cleanArgs[1]) {
-          throw new Error("Usage: bnd receive <file|->");
-        }
+        if (!cleanArgs[1]) throw new Error("Usage: bnd receive <file|->");
         await receive({ source: cleanArgs[1], rig: rigOverride, verbose });
-        break;
-      }
-
-      case "status": {
-        await status({ rig: rigOverride, verbose });
-        break;
-      }
-
-      case "upload": {
-        await upload(cleanArgs.slice(1), verbose);
-        break;
-      }
-
-      case "deploy": {
-        await deploy(cleanArgs.slice(1), verbose);
         break;
       }
 
@@ -183,9 +123,7 @@ async function main(): Promise<void> {
       }
 
       case "observe": {
-        if (!cleanArgs[1]) {
-          throw new Error("Usage: bnd observe <pattern>");
-        }
+        if (!cleanArgs[1]) throw new Error("Usage: bnd observe <pattern>");
         await observe({
           pattern: cleanArgs[1],
           rig: rigOverride,
@@ -195,16 +133,8 @@ async function main(): Promise<void> {
         break;
       }
 
-      case "delete": {
-        if (!cleanArgs[1]) {
-          throw new Error("URI required. Usage: bnd delete <uri>");
-        }
-        await del(cleanArgs[1], verbose);
-        break;
-      }
-
-      case "health": {
-        await health(verbose);
+      case "status": {
+        await status({ rig: rigOverride, verbose });
         break;
       }
 
@@ -213,9 +143,7 @@ async function main(): Promise<void> {
           await configShow();
         } else if (subcommand === "rig") {
           if (!cleanArgs[2]) {
-            throw new Error(
-              "Path required. Usage: bnd config rig <path|url>",
-            );
+            throw new Error("Path required. Usage: bnd config rig <path|url>");
           }
           await configSetRig(cleanArgs[2]);
         } else if (subcommand === "edit") {
@@ -228,97 +156,6 @@ async function main(): Promise<void> {
         break;
       }
 
-      case "node": {
-        if (!subcommand) {
-          throw new Error(
-            "Subcommand required. Usage: bnd node <keygen|config|status>",
-          );
-        }
-        if (subcommand === "keygen") {
-          await nodeKeygen(cleanArgs[2]);
-        } else if (subcommand === "env") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Key file path required. Usage: bnd node env <keyfile>",
-            );
-          }
-          await nodeEnv(cleanArgs[2]);
-        } else if (subcommand === "config") {
-          const action = cleanArgs[2];
-          if (action === "push") {
-            if (!cleanArgs[3]) {
-              throw new Error(
-                "Config file path required. Usage: bnd node config push <file>",
-              );
-            }
-            await nodeConfigPush(cleanArgs[3], verbose);
-          } else if (action === "get") {
-            if (!cleanArgs[3]) {
-              throw new Error(
-                "Node ID required. Usage: bnd node config get <nodeId>",
-              );
-            }
-            await nodeConfigGet(cleanArgs[3], verbose);
-          } else {
-            throw new Error("Usage: bnd node config <push|get>");
-          }
-        } else if (subcommand === "status") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Node ID required. Usage: bnd node status <nodeId>",
-            );
-          }
-          await nodeStatus(cleanArgs[2], verbose);
-        } else {
-          throw new Error(`Unknown node subcommand: ${subcommand}`);
-        }
-        break;
-      }
-
-      case "network": {
-        if (!subcommand) {
-          throw new Error(
-            "Subcommand required. Usage: bnd network <create|up|status>",
-          );
-        }
-        if (subcommand === "create") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Network name required. Usage: bnd network create <name>",
-            );
-          }
-          await networkCreate(cleanArgs[2], cleanArgs[3]);
-        } else if (subcommand === "up") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Manifest path required. Usage: bnd network up <manifest>",
-            );
-          }
-          await networkUp(cleanArgs[2], verbose);
-        } else if (subcommand === "status") {
-          if (!cleanArgs[2]) {
-            throw new Error(
-              "Network ID or manifest path required. Usage: bnd network status <id|path>",
-            );
-          }
-          await networkStatus(cleanArgs[2], verbose);
-        } else {
-          throw new Error(`Unknown network subcommand: ${subcommand}`);
-        }
-        break;
-      }
-
-      case "server-keys": {
-        if (subcommand === "env") {
-          await serverKeysEnv();
-        } else {
-          throw new Error(
-            "Unknown server-keys subcommand. Usage: bnd server-keys env",
-          );
-        }
-        break;
-      }
-
       case "help":
       case "-h":
       case "--help": {
@@ -327,7 +164,9 @@ async function main(): Promise<void> {
       }
 
       default:
-        throw new Error(`Unknown command: ${command}`);
+        throw new Error(
+          `Unknown command: ${command}\nRun \`bnd help\` for usage.`,
+        );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -336,7 +175,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Run main function
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`✗ Fatal error: ${message}`);
