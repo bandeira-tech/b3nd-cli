@@ -9,12 +9,9 @@ import {
   deploy,
   encryptCreate,
   health,
-  list,
-  read,
   serverKeysEnv,
   showHelp,
   upload,
-  watch,
 } from "./commands.ts";
 import {
   configEdit,
@@ -24,6 +21,8 @@ import {
 } from "./commands/config.ts";
 import { receive, send } from "./commands/send.ts";
 import { status } from "./commands/status.ts";
+import { read } from "./commands/read.ts";
+import { observe } from "./commands/observe.ts";
 import {
   nodeConfigGet,
   nodeConfigPush,
@@ -34,33 +33,29 @@ import {
 import { networkCreate, networkStatus, networkUp } from "./commands/network.ts";
 
 /**
- * Parse verbose flag from args
+ * Parse universal flags. Strips them from args and returns the rest as
+ * positional. Anywhere-in-argv: -v/--verbose, --rig <x>, --json.
  */
-function parseVerboseFlag(
-  args: string[],
-): { args: string[]; verbose: boolean } {
-  const index = args.findIndex((arg) => arg === "-v" || arg === "--verbose");
-  if (index !== -1) {
-    return {
-      args: args.filter((_, i) => i !== index),
-      verbose: true,
-    };
-  }
-  return { args, verbose: false };
+interface ParsedFlags {
+  args: string[];
+  verbose: boolean;
+  json: boolean;
+  rig?: string;
 }
 
-/**
- * Parse --rig flag from args (universal override for the resolved rig)
- */
-function parseRigFlag(
-  args: string[],
-): { args: string[]; rig?: string } {
-  const index = args.findIndex((a) => a === "--rig");
-  if (index === -1 || !args[index + 1]) return { args };
-  return {
-    args: args.filter((_, i) => i !== index && i !== index + 1),
-    rig: args[index + 1],
-  };
+function parseFlags(args: string[]): ParsedFlags {
+  let verbose = false;
+  let json = false;
+  let rig: string | undefined;
+  const positional: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "-v" || a === "--verbose") verbose = true;
+    else if (a === "--json") json = true;
+    else if (a === "--rig" && args[i + 1] !== undefined) rig = args[++i];
+    else positional.push(a);
+  }
+  return { args: positional, verbose, json, rig };
 }
 
 /**
@@ -74,8 +69,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { args: afterVerbose, verbose } = parseVerboseFlag(args);
-  const { args: cleanArgs, rig: rigOverride } = parseRigFlag(afterVerbose);
+  const {
+    args: cleanArgs,
+    verbose,
+    json,
+    rig: rigOverride,
+  } = parseFlags(args);
   const command = cleanArgs[0];
   const subcommand = cleanArgs[1];
 
@@ -171,23 +170,28 @@ async function main(): Promise<void> {
       }
 
       case "read": {
-        if (!cleanArgs[1]) {
-          throw new Error("URI required. Usage: bnd read <uri>");
+        if (cleanArgs.length < 2) {
+          throw new Error("Usage: bnd read <uri> [<uri>...]");
         }
-        await read(cleanArgs[1], verbose);
+        await read({
+          uris: cleanArgs.slice(1),
+          rig: rigOverride,
+          json,
+          verbose,
+        });
         break;
       }
 
-      case "list": {
+      case "observe": {
         if (!cleanArgs[1]) {
-          throw new Error("URI required. Usage: bnd list <uri>");
+          throw new Error("Usage: bnd observe <pattern>");
         }
-        await list(cleanArgs[1], verbose);
-        break;
-      }
-
-      case "watch": {
-        await watch(cleanArgs.slice(1), verbose);
+        await observe({
+          pattern: cleanArgs[1],
+          rig: rigOverride,
+          json,
+          verbose,
+        });
         break;
       }
 
