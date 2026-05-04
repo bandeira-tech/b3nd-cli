@@ -10,6 +10,7 @@ import { receive, send } from "./commands/send.ts";
 import { status } from "./commands/status.ts";
 import { read } from "./commands/read.ts";
 import { observe } from "./commands/observe.ts";
+import { node } from "./commands/node.ts";
 
 const HELP = `bnd — B3nd CLI (v0.3)
 
@@ -23,7 +24,9 @@ Commands:
   bnd read <uri> [<uri>...]        Read URIs (trailing slash → list)
   bnd observe <pattern>            Subscribe to URI pattern (Ctrl+C to stop)
   bnd status                       Show resolved rig health
-  bnd node ...                     (coming in v0.3 — host a rig over HTTP/gRPC/MCP)
+  bnd node [<rig>]                 Host the rig over HTTP/gRPC/MCP
+                                   Flags: --http[=port] --grpc[=port] --mcp
+                                          --cors '*' --watch
 
 Config:
   bnd config                       Show current config + resolved rig
@@ -135,6 +138,15 @@ async function main(): Promise<void> {
 
       case "status": {
         await status({ rig: rigOverride, verbose });
+        break;
+      }
+
+      case "node": {
+        await node({
+          rig: rigOverride,
+          verbose,
+          args: cleanArgs.slice(1),
+        });
         break;
       }
 

@@ -19,23 +19,29 @@ function formatValue(value: unknown): string {
 export class Logger {
   constructor(private config: LoggerConfig) {}
 
+  /**
+   * Progress chatter goes to stderr — keeps stdout clean for the
+   * actual data each command emits, and prevents pollution when
+   * `bnd node --mcp` uses stdio for JSON-RPC.
+   */
+
   /** Log HTTP request being made */
   http(method: string, url: string): void {
     if (!this.config.verbose) return;
-    console.log(`  → ${method} ${url}`);
+    console.error(`  → ${method} ${url}`);
   }
 
   /** Log important info (connection, results, etc) */
   info(message: string): void {
     if (!this.config.verbose) return;
-    console.log(`  ℹ ${message}`);
+    console.error(`  ℹ ${message}`);
   }
 
   /** Log detailed data structures */
   data(label: string, value: unknown): void {
     if (!this.config.verbose) return;
-    console.log(`  ${label}:`);
-    console.log(`    ${formatValue(value)}`);
+    console.error(`  ${label}:`);
+    console.error(`    ${formatValue(value)}`);
   }
 
   error(message: string): void {
@@ -45,9 +51,9 @@ export class Logger {
 
   section(name: string): void {
     if (!this.config.verbose) return;
-    console.log(`\n${"─".repeat(60)}`);
-    console.log(`  ${name}`);
-    console.log(`${"─".repeat(60)}`);
+    console.error(`\n${"─".repeat(60)}`);
+    console.error(`  ${name}`);
+    console.error(`${"─".repeat(60)}`);
   }
 }
 
