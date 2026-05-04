@@ -13,7 +13,9 @@ import { ensureDir } from "@std/fs";
 import { getConfigPath, loadConfig, updateConfig } from "../config.ts";
 import { resolveRigSource } from "../rig-loader.ts";
 
-const DEFAULT_RIG_PATH = `${Deno.env.get("HOME") ?? "."}/.bnd/rig.ts`;
+function defaultRigPath(): string {
+  return `${Deno.env.get("HOME") ?? "."}/.bnd/rig.ts`;
+}
 
 export async function configShow(): Promise<void> {
   const config = await loadConfig();
@@ -99,7 +101,7 @@ export async function configEdit(): Promise<void> {
 export async function configInit(targetPath?: string): Promise<void> {
   const finalPath = targetPath
     ? (isAbsolute(targetPath) ? targetPath : resolve(targetPath))
-    : DEFAULT_RIG_PATH;
+    : defaultRigPath();
 
   try {
     await Deno.stat(finalPath);
