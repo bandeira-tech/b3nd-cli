@@ -8,6 +8,7 @@ export interface BndConfig {
   node?: string;
   account?: string;
   encrypt?: string; // "true" or "false"
+  rig?: string; // path or URL to default rig module (v0.3+)
 }
 
 /**
@@ -27,6 +28,7 @@ function parseToml(content: string): BndConfig {
       if (key === "node") config.node = value;
       if (key === "account") config.account = value;
       if (key === "encrypt") config.encrypt = value;
+      if (key === "rig") config.rig = value;
       continue;
     }
 
@@ -45,6 +47,7 @@ function parseToml(content: string): BndConfig {
  */
 function serializeToml(config: BndConfig): string {
   const lines: string[] = [];
+  if (config.rig) lines.push(`rig = "${config.rig}"`);
   if (config.node) lines.push(`node = "${config.node}"`);
   if (config.account) lines.push(`account = "${config.account}"`);
   if (config.encrypt) lines.push(`encrypt = "${config.encrypt}"`);

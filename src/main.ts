@@ -13,11 +13,16 @@ import {
   read,
   send,
   serverKeysEnv,
-  showConfig,
   showHelp,
   upload,
   watch,
 } from "./commands.ts";
+import {
+  configEdit,
+  configInit,
+  configSetRig,
+  configShow,
+} from "./commands/config.ts";
 import {
   nodeConfigGet,
   nodeConfigPush,
@@ -168,7 +173,22 @@ async function main(): Promise<void> {
       }
 
       case "config": {
-        await showConfig();
+        if (!subcommand || subcommand === "show") {
+          await configShow();
+        } else if (subcommand === "rig") {
+          if (!cleanArgs[2]) {
+            throw new Error(
+              "Path required. Usage: bnd config rig <path|url>",
+            );
+          }
+          await configSetRig(cleanArgs[2]);
+        } else if (subcommand === "edit") {
+          await configEdit();
+        } else if (subcommand === "init") {
+          await configInit(cleanArgs[2]);
+        } else {
+          throw new Error(`Unknown config subcommand: ${subcommand}`);
+        }
         break;
       }
 
