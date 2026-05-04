@@ -1,8 +1,14 @@
 import { ensureDir } from "@std/fs";
 import { join } from "@std/path";
 
-const CONFIG_DIR = join(Deno.env.get("HOME") || ".", ".bnd");
-const CONFIG_FILE = join(CONFIG_DIR, "config.toml");
+// Read HOME per-call so tests (and any runtime HOME swap) work correctly.
+function configDir(): string {
+  return join(Deno.env.get("HOME") || ".", ".bnd");
+}
+
+function configFile(): string {
+  return join(configDir(), "config.toml");
+}
 
 export interface BndConfig {
   node?: string;
@@ -14,7 +20,7 @@ export interface BndConfig {
 /**
  * Parse a simple TOML format config file
  */
-function parseToml(content: string): BndConfig {
+export function parseToml(content: string): BndConfig {
   const config: BndConfig = {};
   const lines = content.split("\n");
 
@@ -45,7 +51,7 @@ function parseToml(content: string): BndConfig {
 /**
  * Serialize config to TOML format
  */
-function serializeToml(config: BndConfig): string {
+export function serializeToml(config: BndConfig): string {
   const lines: string[] = [];
   if (config.rig) lines.push(`rig = "${config.rig}"`);
   if (config.node) lines.push(`node = "${config.node}"`);
@@ -59,7 +65,7 @@ function serializeToml(config: BndConfig): string {
  */
 export async function loadConfig(): Promise<BndConfig> {
   try {
-    const content = await Deno.readTextFile(CONFIG_FILE);
+    const content = await Deno.readTextFile(configFile());
     return parseToml(content);
   } catch (e) {
     if (e instanceof Deno.errors.NotFound) {
@@ -73,9 +79,9 @@ export async function loadConfig(): Promise<BndConfig> {
  * Save configuration to ~/.bnd/config.toml
  */
 export async function saveConfig(config: BndConfig): Promise<void> {
-  await ensureDir(CONFIG_DIR);
+  await ensureDir(configDir());
   const content = serializeToml(config);
-  await Deno.writeTextFile(CONFIG_FILE, content);
+  await Deno.writeTextFile(configFile(), content);
 }
 
 /**
@@ -89,12 +95,12 @@ export async function updateConfig(
   config[key] = value;
   await saveConfig(config);
   console.log(`✓ Set ${key} = ${value}`);
-  console.log(`  Config saved to ${CONFIG_FILE}`);
+  console.log(`  Config saved to ${configFile()}`);
 }
 
 /**
  * Get config file path (for display purposes)
  */
 export function getConfigPath(): string {
-  return CONFIG_FILE;
+  return configFile();
 }
