@@ -23,7 +23,9 @@ jobs:
         with:
           path: |
             ~/.cache/deno
-          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+          # deno.lock is gitignored, so key on deno.json instead — it's
+          # the source of truth for which versions we resolve to.
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.json') }}
           restore-keys: |
             deno-${{ runner.os }}-
 

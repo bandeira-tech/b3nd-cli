@@ -7,3 +7,5 @@ npm/
 .DS_Store
 deno.lock
 bnd.bundle.js
+# Compiled output of `deno task compile`
+bnd
