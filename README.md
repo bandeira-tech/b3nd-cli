@@ -1,200 +1,197 @@
-# b3nd CLI
+# b3nd CLI (`bnd`)
 
-A command-line interface for b3nd nodes, built with Deno and the b3nd-sdk. Its
-primary function is to help develop and debug nodes from your terminal.
+A thin framework runner for [B3nd](https://github.com/bandeira-tech/b3nd).
+Loads a user-defined **rig module** and uses it to send / receive / read /
+observe data, or to host the rig over HTTP / gRPC / MCP.
 
-## Installation
+The CLI doesn't know about signing, envelopes, content addressing or any
+other protocol concern — those live in your rig module (or in the protocol
+package you import there). `bnd` is the runner; your rig is the wiring.
 
-Requirements:
+## Install
 
-- Deno 1.40+
-
-Clone and run directly:
-
-```bash
-deno run --allow-read --allow-write --allow-env --allow-net src/main.ts <command> [options]
-```
-
-Or create an alias:
+Requires Deno 2.x.
 
 ```bash
-alias bnd='deno run --allow-read --allow-write --allow-env --allow-net /path/to/cli/src/main.ts'
+# From JSR (recommended)
+deno install --global -A -n bnd jsr:@bandeira-tech/b3nd-cli
+
+# Or compile a standalone binary
+deno install --global -A -n bnd jsr:@bandeira-tech/b3nd-cli
+# …then `bnd help`
 ```
 
-## Quick Start
+For local development inside this repo, use `deno task dev <args>`.
 
-Configure your node and account:
+## Quickstart
 
 ```bash
-bnd conf node https://your-node.example.com
-bnd conf account path/to/my/key
+bnd config init        # scaffold ~/.bnd/rig.ts and point config at it
+bnd config edit        # open the rig file in $EDITOR
+bnd status             # check the rig is reachable
 ```
 
-View your configuration:
+You're done — every other command flows through the rig.
+
+## Commands
+
+```
+bnd send <file|->                 Send ready outputs (rig.send)
+bnd receive <file|->              Ingest ready outputs (rig.receive)
+bnd read <uri> [<uri>...]         Read URIs (trailing slash → list children)
+bnd observe <pattern>             Subscribe to URI pattern (Ctrl+C to stop)
+bnd status                        Show resolved rig health
+bnd node [<rig>]                  Host the rig over HTTP/gRPC/MCP
+                                  Flags: --http[=port] --grpc[=port] --mcp
+                                         --cors '*' --watch
+
+bnd config                        Show current config + resolved rig
+bnd config init [<path>]          Scaffold a starter b3nd.rig.ts
+bnd config rig <path|url>         Set the default rig
+bnd config edit                   Open the resolved rig in $EDITOR
+```
+
+## The rig module
+
+A **rig module** is a TypeScript (or JavaScript) file that default-exports a
+`Rig` instance — or a function that returns one. Every command imports it
+and uses it.
+
+```ts
+// b3nd.rig.ts
+import {
+  Rig,
+  connection,
+  createClientFromUrl,
+} from "jsr:@bandeira-tech/b3nd-core@^0.12.0/rig";
+
+export default async () => {
+  const client = await createClientFromUrl("https://node.example.com");
+  const all = connection(client, ["*"]);
+  return new Rig({
+    routes: { send: [all], receive: [all], read: [all], observe: [all] },
+  });
+};
+```
+
+The default export can be:
+
+- a `Rig` instance directly, or
+- a function `() => Rig | Promise<Rig>`, or
+- an async function that receives `Deno.env.toObject()` if you want env-driven config:
+  `async (env) => buildRig(env)`.
+
+Resolution order (every command does this):
+
+1. `--rig <path|url>` flag — wins if present.
+2. `./b3nd.rig.ts` (or `.js`) in the current directory — picked up automatically.
+3. `rig = "..."` in `~/.bnd/config.toml` — your global default.
+
+The `<path|url>` accepts anything Deno's dynamic `import()` does:
+relative paths, absolute paths, `jsr:`, `npm:`, `https:`, `file:`.
+
+## Universal flags
+
+These work on any command:
+
+| Flag | Effect |
+|---|---|
+| `-v` / `--verbose` | Progress chatter to stderr |
+| `--rig <path\|url>` | Override the resolved rig for this run |
+| `--json` | Machine output (NDJSON for `observe`, JSON array for `read`) |
+
+## Streaming (pipes)
+
+`bnd send` and `bnd receive` read from a file or stdin. For stdin, the
+input format is auto-detected:
+
+- **NDJSON streaming** — first non-empty line parses as JSON on its own;
+  each subsequent line is dispatched as it arrives.
+- **Buffered single-JSON** — first line doesn't parse standalone (e.g.
+  pretty-printed multi-line JSON); read everything, parse at EOF.
+
+So both work seamlessly:
 
 ```bash
-bnd config
-cat ~/.bnd/config.toml
+# A single ready output
+echo '["mutable://x", {"v": 1}]' | bnd send -
+
+# An NDJSON stream
+my-protocol-tool | bnd send -
+
+# Pipe between two nodes (with a one-line jq reshape because observe
+# emits ReadResult objects, not Output tuples)
+bnd observe 'mutable://*' --json \
+  | jq -c '[.uri, .record.data]' \
+  | bnd receive -
 ```
 
-## Usage
+Each line of `bnd send`/`bnd receive` output is `✓ <uri>` on accept or
+`✗ <uri> — <error>` on reject; non-zero exit on any reject.
 
-### Configuration Commands
+## Hosting a rig
 
-Set the node URL (required for all operations):
+`bnd node` exposes the rig over one or more transports using
+[`@bandeira-tech/b3nd-servers`](https://jsr.io/@bandeira-tech/b3nd-servers).
 
 ```bash
-bnd conf node <url>
+bnd node                       # default: --http on :3000
+bnd node ./my-rig.ts           # explicit rig
+bnd node --http=4000           # custom port
+bnd node --http=0.0.0.0:4000   # bind hostname:port
+bnd node --grpc                # gRPC on :50051
+bnd node --mcp                 # MCP over stdio
+bnd node --http --grpc --mcp   # all three
+bnd node --cors '*'            # CORS for HTTP/gRPC
+bnd node --watch               # restart on rig file change
 ```
 
-Set the account key path:
+When `--mcp` is set, stdout is reserved for MCP JSON-RPC; bnd's status
+output goes to stderr (this is true for every command — `stdout = data`,
+`stderr = chatter`).
 
-```bash
-bnd conf account <path>
-```
+## Configuration
 
-### Data Operations
-
-Write data to a URI:
-
-```bash
-bnd write tmp://some/path "this is a nice little payload"
-bnd write store://account/:key/data {"name": "Alice", "age": 30}
-```
-
-Write data from a JSON file:
-
-```bash
-# Note: The filename (without extension) becomes the URI
-# For test_payload.json, the URI will be 'test_payload'
-# This only works if 'test_payload' is a valid program key on your node
-
-# Better: Provide an explicit URI with the file
-bnd write test://my-data -f mypayload.json
-```
-
-Read data from a URI:
-
-```bash
-bnd read tmp://some/path
-bnd read store://account/:key/profile
-```
-
-List items at a URI:
-
-```bash
-bnd list store://account/:key/books
-```
-
-### Utility Commands
-
-Show current configuration:
-
-```bash
-bnd config
-```
-
-Show help:
-
-```bash
-bnd help
-bnd -h
-bnd --help
-```
-
-## Examples
-
-```bash
-# Configure
-bnd conf node https://your-node.example.com
-bnd conf account path/to/my/key
-
-# Write operations
-bnd write tmp://some/path "this is a nice little payload"
-bnd write tmp://users/alice '{"name": "Alice", "age": 30}'
-bnd write -f mypayload.json
-
-# Read operations
-bnd read tmp://some/path
-bnd read store://account/:key/profile
-
-# List operations
-bnd list store://account/:key/books
-
-# View config
-bnd config
-cat ~/.bnd/config.toml
-```
-
-## Configuration File
-
-Configuration is stored in `~/.bnd/config.toml` in TOML format:
+`~/.bnd/config.toml` is a single-line file:
 
 ```toml
-node = "https://your-node.example.com"
-account = "path/to/my/key"
+rig = "/Users/me/.bnd/rig.ts"
 ```
 
-## Architecture
+That's the entire schema. Everything else is in your rig module.
 
-- **src/main.ts** - CLI entry point with command routing
-- **src/config.ts** - Configuration management (TOML parsing/serialization)
-- **src/client.ts** - B3nd HTTP client initialization and caching
-- **src/commands.ts** - Command handlers (conf, write, read, list, config)
+## Project layout
 
-## Debugging with Verbose Mode
-
-Use the `--verbose` or `-v` flag to see detailed operation logs:
-
-```bash
-# Show what the CLI is doing
-bnd -v write tmp://test "data"
-bnd --verbose read tmp://test
-bnd -v list store://account/:key/items
-
-# Combine with any command
-bnd write -v tmp://test "data"
 ```
-
-**Verbose output shows:**
-
-- Configuration loading
-- HTTP client initialization
-- Node health check
-- Exact request parameters
-- Server responses (including error details)
-- Timestamps and record data
-
-This is invaluable for debugging connection issues, protocol problems, and
-understanding what the node is returning.
-
-See [VERBOSE_MODE.md](./VERBOSE_MODE.md) for detailed debugging guide.
+src/
+  main.ts              # argv routing
+  config.ts            # ~/.bnd/config.toml read/write
+  rig-loader.ts        # rig resolution + dynamic import + duck-typing
+  io.ts                # file/stdin → ready outputs (NDJSON auto-detect)
+  logger.ts            # verbose chatter (always to stderr)
+  commands/
+    config.ts          # bnd config init / rig / edit / show
+    send.ts            # bnd send / bnd receive
+    read.ts            # bnd read
+    observe.ts         # bnd observe
+    status.ts          # bnd status
+    node.ts            # bnd node (HTTP/gRPC/MCP + --watch)
+  templates/
+    starter.rig.ts     # written by `bnd config init`
+```
 
 ## Development
 
-Check TypeScript:
-
 ```bash
-deno check src/main.ts
+deno task dev <args>    # run the CLI from source
+deno task fmt           # format
+deno task lint          # lint
+deno task check         # type-check
+deno task test          # run unit tests
+deno task compile       # produce a standalone `bnd` binary
 ```
 
-Format code:
-
-```bash
-deno fmt src/
-```
-
-Lint code:
-
-```bash
-deno lint src/
-```
-
-## Dependencies
-
-- **@bandeira-tech/b3nd-sdk** - Universal persistence interface
-- **@std/fs** - Deno standard library filesystem utilities
-- **@std/path** - Deno standard library path utilities
+CI runs `fmt:check + lint + check + test` on every push and PR.
 
 ## License
 
