@@ -11,10 +11,7 @@ function configFile(): string {
 }
 
 export interface BndConfig {
-  node?: string;
-  account?: string;
-  encrypt?: string; // "true" or "false"
-  rig?: string; // path or URL to default rig module (v0.3+)
+  rig?: string; // path or URL to default rig module
 }
 
 /**
@@ -31,17 +28,8 @@ export function parseToml(content: string): BndConfig {
     const stringMatch = trimmed.match(/^(\w+)\s*=\s*"([^"]*)"/);
     if (stringMatch) {
       const [, key, value] = stringMatch;
-      if (key === "node") config.node = value;
-      if (key === "account") config.account = value;
-      if (key === "encrypt") config.encrypt = value;
       if (key === "rig") config.rig = value;
       continue;
-    }
-
-    const boolMatch = trimmed.match(/^(\w+)\s*=\s*(true|false)/);
-    if (boolMatch) {
-      const [, key, value] = boolMatch;
-      if (key === "encrypt") config.encrypt = value;
     }
   }
 
@@ -54,9 +42,6 @@ export function parseToml(content: string): BndConfig {
 export function serializeToml(config: BndConfig): string {
   const lines: string[] = [];
   if (config.rig) lines.push(`rig = "${config.rig}"`);
-  if (config.node) lines.push(`node = "${config.node}"`);
-  if (config.account) lines.push(`account = "${config.account}"`);
-  if (config.encrypt) lines.push(`encrypt = "${config.encrypt}"`);
   return lines.join("\n") + (lines.length > 0 ? "\n" : "");
 }
 

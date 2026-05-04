@@ -1,7 +1,7 @@
 {
   "name": "@bandeira-tech/b3nd-cli",
-  "version": "0.2.0",
-  "description": "B3nd CLI — `bnd` command-line tool for driving b3nd nodes (send, read, list, watch, deploy, manage keys/configs/networks)",
+  "version": "0.3.0",
+  "description": "B3nd CLI — `bnd` command-line tool. A thin framework runner that loads a user-defined rig module and uses it to send/receive/read/observe/serve. Protocol concerns (signing, envelope-building) live in your rig.",
   "exports": {
     ".": "./src/main.ts"
   },
@@ -15,15 +15,8 @@
     "compile": "deno compile --allow-read --allow-write --allow-env --allow-net --output bnd src/main.ts"
   },
   "imports": {
-    "@bandeira-tech/b3nd-core": "jsr:@bandeira-tech/b3nd-core@^0.12.0",
-    "@bandeira-tech/b3nd-core/rig": "jsr:@bandeira-tech/b3nd-core@^0.12.0/rig",
-    "@bandeira-tech/b3nd-core/identity": "jsr:@bandeira-tech/b3nd-core@^0.12.0/identity",
-    "@bandeira-tech/b3nd-core/types": "jsr:@bandeira-tech/b3nd-core@^0.12.0/types",
-    "@bandeira-tech/b3nd-canon/msg": "jsr:@bandeira-tech/b3nd-canon@^0.11.0/msg",
-    "@bandeira-tech/b3nd-canon/encrypt": "jsr:@bandeira-tech/b3nd-canon@^0.11.0/encrypt",
     "@std/path": "jsr:@std/path@1",
     "@std/fs": "jsr:@std/fs@1",
-    "@std/encoding/hex": "jsr:@std/encoding@1/hex",
     "@std/assert": "jsr:@std/assert@1"
   },
   "compilerOptions": {

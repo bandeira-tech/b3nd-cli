@@ -24,18 +24,10 @@ export async function configShow(): Promise<void> {
   console.log(`Config: ${cfgPath}`);
   console.log("");
 
-  const hasAny = config.rig || config.node || config.account || config.encrypt;
-  if (!hasAny) {
+  if (!config.rig) {
     console.log("  (empty — run `bnd config init` to scaffold a starter rig)");
   } else {
-    if (config.rig) console.log(`  rig     = ${config.rig}`);
-    if (config.node) console.log(`  node    = ${config.node}    (legacy)`);
-    if (config.account) {
-      console.log(`  account = ${config.account}    (legacy)`);
-    }
-    if (config.encrypt) {
-      console.log(`  encrypt = ${config.encrypt}    (legacy)`);
-    }
+    console.log(`  rig = ${config.rig}`);
   }
 
   console.log("");
