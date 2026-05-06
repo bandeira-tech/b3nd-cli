@@ -53,19 +53,18 @@ async function dispatch(
   // Call via the rig directly so `this` is bound — `rig.send` / `rig.receive`
   // depend on private state (`_pipeline`) which is unreachable when the
   // method is destructured into a free variable.
-  const dispatchTo = (
-    rig as unknown as Record<
-      string,
-      (this: unknown, o: unknown[]) => unknown
-    >
-  );
+  const dispatchTo = rig as unknown as Record<
+    string,
+    (this: unknown, o: unknown[]) => unknown
+  >;
 
   let total = 0;
   let failed = 0;
 
   for await (const batch of streamOutputs(opts.source)) {
     total += batch.length;
-    const results = (await dispatchTo[method].call(rig, batch)) as ResultShape[];
+    const results =
+      (await dispatchTo[method].call(rig, batch)) as ResultShape[];
     for (const r of results) {
       const uri = r.uri ?? "?";
       if (r.accepted) {
