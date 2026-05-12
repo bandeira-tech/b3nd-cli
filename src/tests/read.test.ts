@@ -1,8 +1,4 @@
-import {
-  assert,
-  assertEquals,
-  assertStringIncludes,
-} from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { rigEnv, runBnd, TEST_RIG, withTempHome } from "./helpers.ts";
 
 Deno.test("bnd read <uri> → uri label + data, exit 0", async () => {

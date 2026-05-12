@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push *)",
+            "command": "deno fmt --check src/",
+            "statusMessage": "Checking formatting..."
+          }
+        ]
+      }
+    ]
+  }
+}
