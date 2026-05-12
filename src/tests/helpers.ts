@@ -4,6 +4,16 @@ const MAIN = new URL("../main.ts", import.meta.url).pathname;
 export const TEST_RIG = new URL("./fixtures/test.rig.ts", import.meta.url)
   .pathname;
 
+// Capture the real Deno cache dir once at module load time.
+// Deno derives DENO_DIR from HOME when not set explicitly; overriding HOME in
+// test subprocesses would cause npm cache misses unless we pin it here.
+const DENO_DIR = Deno.env.get("DENO_DIR") ?? (() => {
+  const home = Deno.env.get("HOME") ?? ".";
+  if (Deno.build.os === "darwin") return `${home}/Library/Caches/deno`;
+  const xdgCache = Deno.env.get("XDG_CACHE_HOME") ?? `${home}/.cache`;
+  return `${xdgCache}/deno`;
+})();
+
 export interface RunResult {
   stdout: string;
   stderr: string;
@@ -14,7 +24,7 @@ export async function runBnd(
   args: string[],
   opts: { env?: Record<string, string>; stdin?: string } = {},
 ): Promise<RunResult> {
-  const env = { ...Deno.env.toObject(), ...opts.env };
+  const env = { ...Deno.env.toObject(), DENO_DIR, ...opts.env };
   const cmd = new Deno.Command(Deno.execPath(), {
     args: [
       "run",
