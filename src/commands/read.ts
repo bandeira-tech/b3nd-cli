@@ -1,21 +1,22 @@
 /**
- * `bnd read` — read one or more URIs through the configured rig.
+ * `bnd read` — read one or more locators through the configured rig.
  *
  *   bnd read <uri> [<uri>...]    # batch read
- *   bnd read <uri>/              # trailing slash → list children (rig native)
+ *   bnd read <uri>/              # trailing slash → listing (client-defined)
  *   bnd read <uri> --json        # raw JSON for piping
+ *
+ * The rig returns one `Output<T>` per input — `[locator, payload]`. The
+ * payload's shape is the executing client's concern; the CLI renders it
+ * verbatim. What "miss" looks like, what a listing yields, what an
+ * extension function returns — all up to the client. The CLI's only job
+ * is to surface the bytes the client produced.
  */
 
 import { loadConfig } from "../config.ts";
 import { loadRig } from "../rig-loader.ts";
 import { createLogger } from "../logger.ts";
 
-interface ReadResultShape {
-  success?: boolean;
-  uri?: string;
-  record?: { data?: unknown };
-  error?: string;
-}
+type Output<T = unknown> = [string, T];
 
 export async function read(opts: {
   uris: string[];
@@ -31,31 +32,21 @@ export async function read(opts: {
   });
   logger.info(`Rig: ${source.input} (${source.origin})`);
 
-  const handle = (rig as unknown as {
-    read: (u: string[]) => Promise<ReadResultShape[]>;
+  const outputs = await (rig as unknown as {
+    read: (u: string[]) => Promise<Output[]>;
   }).read(opts.uris);
-  const results = await handle;
 
   if (opts.json) {
-    console.log(JSON.stringify(results, null, 2));
-    if (results.some((r) => r.success === false)) Deno.exit(1);
+    console.log(JSON.stringify(outputs, null, 2));
     return;
   }
 
-  let failed = 0;
-  for (const r of results) {
-    if (r.success === false) {
-      console.error(`✗ ${r.uri ?? "?"} — ${r.error ?? "not found"}`);
-      failed++;
-      continue;
-    }
-    const data = r.record?.data;
-    const rendered = typeof data === "string"
-      ? data
-      : JSON.stringify(data, null, 2);
+  for (const [uri, payload] of outputs) {
+    const rendered = typeof payload === "string"
+      ? payload
+      : JSON.stringify(payload, null, 2);
     const indented = rendered.split("\n").map((l) => `  ${l}`).join("\n");
-    console.log(`${r.uri ?? "?"}:`);
+    console.log(`${uri}:`);
     console.log(indented);
   }
-  if (failed > 0) Deno.exit(1);
 }

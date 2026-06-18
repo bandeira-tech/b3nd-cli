@@ -15,11 +15,14 @@ import { loadRig } from "../rig-loader.ts";
 import { streamOutputs } from "../io.ts";
 import { createLogger } from "../logger.ts";
 
+// Per-output result. `b3nd-core` ReceiveResult has no `uri` field —
+// the URI is implied by position against the input batch.
 interface ResultShape {
   accepted?: boolean;
-  uri?: string;
   error?: string;
 }
+
+type Output = [string, unknown];
 
 export async function send(opts: {
   source: string;
@@ -55,7 +58,7 @@ async function dispatch(
   // method is destructured into a free variable.
   const dispatchTo = rig as unknown as Record<
     string,
-    (this: unknown, o: unknown[]) => unknown
+    (this: unknown, o: Output[]) => PromiseLike<ResultShape[]>
   >;
 
   let total = 0;
@@ -63,14 +66,14 @@ async function dispatch(
 
   for await (const batch of streamOutputs(opts.source)) {
     total += batch.length;
-    const results =
-      (await dispatchTo[method].call(rig, batch)) as ResultShape[];
-    for (const r of results) {
-      const uri = r.uri ?? "?";
-      if (r.accepted) {
+    const results = await dispatchTo[method].call(rig, batch);
+    for (let i = 0; i < batch.length; i++) {
+      const uri = batch[i]?.[0] ?? "?";
+      const r = results[i];
+      if (r?.accepted) {
         console.log(`✓ ${uri}`);
       } else {
-        console.error(`✗ ${uri} — ${r.error ?? "rejected"}`);
+        console.error(`✗ ${uri} — ${r?.error ?? "rejected"}`);
         failed++;
       }
     }

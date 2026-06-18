@@ -8,17 +8,16 @@
  * swap to a local store for `bnd node`, etc.
  */
 
-import {
-  connection,
-  createClientFromUrl,
-  Rig,
-} from "jsr:@bandeira-tech/b3nd-core@^0.12.0/rig";
+import { connection, Rig } from "jsr:@bandeira-tech/b3nd-core@^0.22.0/rig";
+import { HttpClient } from "jsr:@bandeira-tech/b3nd-move@^0.18.0/http/client";
 
-export default async () => {
+export default () => {
   // Default: talk to a local node over HTTP.
   // Replace with your real node URL, or wire multiple targets with patterns.
-  const client = await createClientFromUrl("http://localhost:3000");
-  const all = connection(client, ["*"]);
+  // `**` matches any URI; tighten it (`mutable://**`, `myproto://app/**`) to
+  // shard writes/reads across multiple connections.
+  const client = new HttpClient({ url: "http://localhost:3000" });
+  const all = connection(client, ["**"]);
 
   return new Rig({
     routes: {

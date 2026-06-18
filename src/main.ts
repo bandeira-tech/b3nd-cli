@@ -12,7 +12,7 @@ import { read } from "./commands/read.ts";
 import { observe } from "./commands/observe.ts";
 import { node } from "./commands/node.ts";
 
-const HELP = `bnd — B3nd CLI (v0.3)
+const HELP = `bnd — B3nd CLI (v0.5)
 
 A thin framework tool. Loads a user-defined rig module and uses it
 to send / read / observe / serve. No protocol or signing concerns —
@@ -21,11 +21,12 @@ those belong in your rig module.
 Commands:
   bnd send <file|->                Send ready outputs (rig.send)
   bnd receive <file|->             Ingest ready outputs (rig.receive)
-  bnd read <uri> [<uri>...]        Read URIs (trailing slash → list)
+  bnd read <uri> [<uri>...]        Read locators
   bnd observe <pattern>            Subscribe to URI pattern (Ctrl+C to stop)
   bnd status                       Show resolved rig health
-  bnd node [<rig>]                 Host the rig over HTTP/gRPC/MCP
-                                   Flags: --http[=port] --grpc[=port] --mcp
+  bnd node [<rig>]                 Host the rig over HTTP/WS/gRPC/MCP
+                                   Flags: --http[=port] --ws[=port] --grpc[=port]
+                                          --mcp --mcp-http[=port] --mcp-ws[=port]
                                           --cors '*' --watch
 
 Config:

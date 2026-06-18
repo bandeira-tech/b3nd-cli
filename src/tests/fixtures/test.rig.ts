@@ -3,23 +3,22 @@
  * Behavior is controlled by the B3ND_TEST_MODE env var:
  *   ok (default) — all operations succeed
  *   reject       — send/receive reject every item
- *   missing      — read returns not-found for every URI
+ *   missing      — read returns a "not found" payload for every locator
  *   degraded     — status reports degraded
  *   unhealthy    — status reports unhealthy
+ *
+ * Shape matches `@bandeira-tech/b3nd-core` 0.22:
+ *   send/receive return ReceiveResult[] (just {accepted, error?}, no uri)
+ *   read returns Output<T>[] (= [uri, payload][])
+ *   observe yields readonly string[] (batches of fired URIs)
  */
 
 type Mode = "ok" | "reject" | "missing" | "degraded" | "unhealthy";
 
 const mode = (Deno.env.get("B3ND_TEST_MODE") ?? "ok") as Mode;
 
-type Batch = [string, unknown][];
-type SendResult = { accepted: boolean; uri: string; error?: string };
-type ReadResult = {
-  success: boolean;
-  uri: string;
-  record?: { data: unknown };
-  error?: string;
-};
+type Output<T = unknown> = [string, T];
+type ReceiveResult = { accepted: boolean; error?: string };
 type StatusResult = {
   status: string;
   message: string;
@@ -28,50 +27,42 @@ type StatusResult = {
 };
 
 const rig = {
-  send(batch: Batch): SendResult[] {
+  send(batch: Output[]): ReceiveResult[] {
     if (mode === "reject") {
-      return batch.map(([uri]) => ({
+      return batch.map(() => ({
         accepted: false,
-        uri,
         error: "rejected by test rig",
       }));
     }
-    return batch.map(([uri]) => ({ accepted: true, uri }));
+    return batch.map(() => ({ accepted: true }));
   },
 
-  receive(batch: Batch): SendResult[] {
+  receive(batch: Output[]): ReceiveResult[] {
     if (mode === "reject") {
-      return batch.map(([uri]) => ({
+      return batch.map(() => ({
         accepted: false,
-        uri,
         error: "rejected by test rig",
       }));
     }
-    return batch.map(([uri]) => ({ accepted: true, uri }));
+    return batch.map(() => ({ accepted: true }));
   },
 
-  read(uris: string[]): ReadResult[] {
+  read(locators: string[]): Output[] {
     if (mode === "missing") {
-      return uris.map((uri) => ({ success: false, uri, error: "not found" }));
+      return locators.map((uri) => [uri, { error: "not found" }] as Output);
     }
-    return uris.map((uri) => ({
-      success: true,
-      uri,
-      record: { data: { value: 42 } },
-    }));
+    return locators.map((uri) => [uri, { value: 42 }] as Output);
   },
 
   async *observe(
-    pattern: string,
+    locators: string[],
     signal: AbortSignal,
-  ): AsyncGenerator<unknown> {
-    const values = [
-      { uri: `${pattern}/1`, event: "first" },
-      { uri: `${pattern}/2`, event: "second" },
-    ];
-    for (const v of values) {
+  ): AsyncGenerator<readonly string[]> {
+    const base = locators[0] ?? "test://";
+    const batches: string[][] = [[`${base}/1`], [`${base}/2`]];
+    for (const batch of batches) {
       if (signal.aborted) return;
-      yield v;
+      yield batch;
     }
   },
 

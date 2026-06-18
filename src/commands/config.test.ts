@@ -62,7 +62,7 @@ Deno.test("configInit: creates default rig file and points config at it", async 
     // file exists with template content
     const content = await Deno.readTextFile(expected);
     assertStringIncludes(content, "export default");
-    assertStringIncludes(content, "createClientFromUrl");
+    assertStringIncludes(content, "HttpClient");
 
     // config points at it
     assertEquals((await loadConfig()).rig, expected);

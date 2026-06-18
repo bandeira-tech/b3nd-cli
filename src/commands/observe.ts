@@ -1,11 +1,12 @@
 /**
- * `bnd observe` — subscribe to a URI pattern via the configured rig.
+ * `bnd observe` — subscribe to URI patterns via the configured rig.
  *
  *   bnd observe <pattern>
  *   bnd observe <pattern> --json     # NDJSON for piping (jq, awk, etc.)
  *
- * Ctrl+C aborts the subscription cleanly. For transformations, pipe
- * the --json output through your tool of choice.
+ * The rig yields batches of fired URIs (`readonly string[]`). Each URI
+ * in each batch becomes one line — plain text by default, JSON-encoded
+ * string under `--json`. Ctrl+C aborts the subscription cleanly.
  */
 
 import { loadConfig } from "../config.ts";
@@ -32,12 +33,17 @@ export async function observe(opts: {
   Deno.addSignalListener("SIGINT", onSignal);
 
   const stream = (rig as unknown as {
-    observe: (p: string, signal: AbortSignal) => AsyncIterable<unknown>;
-  }).observe(opts.pattern, ctrl.signal);
+    observe: (
+      urls: string[],
+      signal: AbortSignal,
+    ) => AsyncIterable<readonly string[]>;
+  }).observe([opts.pattern], ctrl.signal);
 
   try {
-    for await (const value of stream) {
-      console.log(render(value, opts.json ?? false));
+    for await (const batch of stream) {
+      for (const uri of batch) {
+        console.log(opts.json ? JSON.stringify(uri) : uri);
+      }
     }
   } catch (e) {
     if (ctrl.signal.aborted) return; // clean Ctrl+C exit
@@ -45,9 +51,4 @@ export async function observe(opts: {
   } finally {
     Deno.removeSignalListener("SIGINT", onSignal);
   }
-}
-
-function render(value: unknown, json: boolean): string {
-  if (typeof value === "string") return value;
-  return json ? JSON.stringify(value) : JSON.stringify(value, null, 2);
 }
