@@ -7,7 +7,7 @@
  *   degraded     — status reports degraded
  *   unhealthy    — status reports unhealthy
  *
- * Shape matches `@bandeira-tech/b3nd-core` 0.22:
+ * Shape matches `@bandeira-tech/b3nd-core` 0.24:
  *   send/receive return ReceiveResult[] (just {accepted, error?}, no uri)
  *   read returns Output<T>[] (= [uri, payload][])
  *   observe yields readonly string[] (batches of fired URIs)

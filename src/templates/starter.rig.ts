@@ -8,8 +8,8 @@
  * swap to a local store for `bnd node`, etc.
  */
 
-import { connection, Rig } from "jsr:@bandeira-tech/b3nd-core@^0.22.0/rig";
-import { HttpClient } from "jsr:@bandeira-tech/b3nd-move@^0.18.0/http/client";
+import { connection, Rig } from "jsr:@bandeira-tech/b3nd-core@^0.24.0/rig";
+import { HttpClient } from "jsr:@bandeira-tech/b3nd-move@^0.19.0/http/client";
 
 export default () => {
   // Default: talk to a local node over HTTP.
