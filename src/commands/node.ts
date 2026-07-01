@@ -249,8 +249,8 @@ function httpTransport(
 ): TransportServer {
   const port = addr.port;
   const hostname = addr.hostname ?? "0.0.0.0";
-  // deno-lint-ignore no-explicit-any
   const handler = withCors(
+    // deno-lint-ignore no-explicit-any
     httpApi(rig as any, { codec: httpOutputsFrame() }),
     cors,
   );
@@ -310,8 +310,8 @@ function grpcTransport(
 ): TransportServer {
   const port = addr.port;
   const hostname = addr.hostname ?? "0.0.0.0";
-  // deno-lint-ignore no-explicit-any
   const handler = withCors(
+    // deno-lint-ignore no-explicit-any
     grpcHttpApi(rig as any, { codec: grpcProto() }),
     cors,
   );
