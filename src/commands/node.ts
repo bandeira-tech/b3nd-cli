@@ -149,7 +149,8 @@ export function makeMcpCloseCallback(
   say: (m: string) => void,
 ): () => void {
   if (stdioIsOnly) return () => ctrl.abort();
-  return () => say("MCP stdio client disconnected; network transports remain up");
+  return () =>
+    say("MCP stdio client disconnected; network transports remain up");
 }
 
 export async function node(opts: {
