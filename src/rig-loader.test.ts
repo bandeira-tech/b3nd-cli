@@ -7,11 +7,45 @@ import {
 import { join } from "@std/path";
 import { toFileUrl } from "@std/path";
 import {
+  applyCacheBust,
   isRigLike,
   loadRig,
   resolveRigSource,
   toImportUrl,
 } from "./rig-loader.ts";
+
+// ── applyCacheBust ───────────────────────────────────────────────────────
+
+Deno.test("applyCacheBust: file: URL gets a ?t= timestamp appended", () => {
+  const result = applyCacheBust("file:///path/to/rig.ts");
+  assert(result.startsWith("file:///path/to/rig.ts?t="), `got: ${result}`);
+  assert(/\?t=\d+$/.test(result), `timestamp not a number: ${result}`);
+});
+
+Deno.test("applyCacheBust: file: URL with existing query uses & separator", () => {
+  const result = applyCacheBust("file:///path/to/rig.ts?existing=1");
+  assert(result.includes("?existing=1&t="), `got: ${result}`);
+});
+
+Deno.test("applyCacheBust: jsr: URL passes through unchanged", () => {
+  const url = "jsr:@scope/pkg/rig";
+  assertEquals(applyCacheBust(url), url);
+});
+
+Deno.test("applyCacheBust: npm: URL passes through unchanged", () => {
+  const url = "npm:some-package";
+  assertEquals(applyCacheBust(url), url);
+});
+
+Deno.test("applyCacheBust: https: URL passes through unchanged", () => {
+  const url = "https://example.com/rig.ts";
+  assertEquals(applyCacheBust(url), url);
+});
+
+Deno.test("applyCacheBust: http: URL passes through unchanged", () => {
+  const url = "http://localhost:8080/rig.ts";
+  assertEquals(applyCacheBust(url), url);
+});
 
 // ── isRigLike ────────────────────────────────────────────────────────────
 
