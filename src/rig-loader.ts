@@ -97,9 +97,10 @@ export async function loadRig(opts: {
     configRig: opts.configRig,
   });
 
-  // Cache-bust so a re-run picks up edits without process restart caches.
-  const url = source.url + (source.url.includes("?") ? "&" : "?") +
-    `t=${Date.now()}`;
+  // Cache-bust local files only — jsr:/npm: are version-immutable and do not
+  // accept query strings; https: should honour Deno's own cache layer (users
+  // can run `deno cache --reload` when they need a fresh fetch).
+  const url = applyCacheBust(source.url);
 
   let mod: { default?: unknown };
   try {
@@ -170,4 +171,16 @@ export function toImportUrl(input: string, cwd: string): string {
   if (/^(jsr|npm|https?|file):/i.test(input)) return input;
   const abs = isAbsolute(input) ? input : resolve(cwd, input);
   return toFileUrl(abs).href;
+}
+
+/**
+ * Append a cache-busting timestamp to `file:` URLs so that local edits are
+ * picked up without restarting the Deno process.  Remote URL schemes
+ * (`jsr:`, `npm:`, `https:`, `http:`) pass through unchanged — they are
+ * either version-immutable (and don't accept query strings) or should use
+ * Deno's own caching layer.
+ */
+export function applyCacheBust(url: string): string {
+  if (!url.startsWith("file:")) return url;
+  return url + (url.includes("?") ? "&" : "?") + `t=${Date.now()}`;
 }

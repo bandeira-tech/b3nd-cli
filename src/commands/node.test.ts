@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import { parseAddr, parseNodeFlags } from "./node.ts";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { makeMcpCloseCallback, parseAddr, parseNodeFlags } from "./node.ts";
 
 // ── parseAddr ────────────────────────────────────────────────────────────
 
@@ -113,4 +113,25 @@ Deno.test("parseNodeFlags: unknown flags pass through as positional (don't swall
     positional: ["--unknown", "value"],
     flags: {},
   });
+});
+
+// ── makeMcpCloseCallback ─────────────────────────────────────────────────
+
+Deno.test("makeMcpCloseCallback: aborts controller when stdio is the only transport", () => {
+  const ctrl = new AbortController();
+  const messages: string[] = [];
+  const cb = makeMcpCloseCallback(ctrl, true, (m) => messages.push(m));
+  cb();
+  assert(ctrl.signal.aborted, "controller should be aborted");
+  assertEquals(messages.length, 0, "should not log when aborting");
+});
+
+Deno.test("makeMcpCloseCallback: logs and does not abort when combined with network transports", () => {
+  const ctrl = new AbortController();
+  const messages: string[] = [];
+  const cb = makeMcpCloseCallback(ctrl, false, (m) => messages.push(m));
+  cb();
+  assert(!ctrl.signal.aborted, "controller should remain live");
+  assertEquals(messages.length, 1);
+  assertStringIncludes(messages[0], "disconnected");
 });

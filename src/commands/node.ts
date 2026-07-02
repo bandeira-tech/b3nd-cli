@@ -45,6 +45,7 @@ import {
 import { mcpHttpApi } from "@bandeira-tech/b3nd-move/mcp/http/service";
 import { mcpWsApi } from "@bandeira-tech/b3nd-move/mcp/ws/service";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { VERSION } from "../version.ts";
 
 interface AddrFlag {
   port: number;
@@ -132,6 +133,26 @@ export function parseAddr(s: string, defaultPort: number): AddrFlag {
   };
 }
 
+/**
+ * Build the onClose callback for the MCP stdio transport.
+ *
+ * When stdio is the only transport, a client disconnect (stdin EOF) should
+ * abort the node controller — MCP hosts (Claude Code, etc.) terminate stdio
+ * servers by closing stdin, not by sending SIGINT. When combined with
+ * network transports, keep serving and just log.
+ *
+ * Exported for unit testing.
+ */
+export function makeMcpCloseCallback(
+  ctrl: AbortController,
+  stdioIsOnly: boolean,
+  say: (m: string) => void,
+): () => void {
+  if (stdioIsOnly) return () => ctrl.abort();
+  return () =>
+    say("MCP stdio client disconnected; network transports remain up");
+}
+
 export async function node(opts: {
   rig?: string;
   verbose?: boolean;
@@ -163,12 +184,27 @@ export async function node(opts: {
   // CLI status to stderr always (stdout might be MCP JSON-RPC).
   const say = (m: string) => console.error(m);
 
+  // Wire SIGINT (and, for stdio-only MCP, stdin EOF) to this controller.
+  // The controller is created before startOnce() so the mcpStdioTransport
+  // builder can close over it.
+  const ctrl = new AbortController();
+  const onSig = () => ctrl.abort();
+  Deno.addSignalListener("SIGINT", onSig);
+
+  // Stdio is the only transport when --mcp is set without any network transport.
+  // In that case closing stdin (MCP client disconnect) should shut the node down.
+  const stdioIsOnly = !!flags.mcp &&
+    !flags.http && !flags.ws && !flags.grpc && !flags.mcpHttp && !flags.mcpWs;
+
   const buildServers = (rig: RigLike): TransportServer[] => {
     const servers: TransportServer[] = [];
     if (flags.http) servers.push(httpTransport(rig, flags.http, flags.cors));
     if (flags.ws) servers.push(wsTransport(rig, flags.ws));
     if (flags.grpc) servers.push(grpcTransport(rig, flags.grpc, flags.cors));
-    if (flags.mcp) servers.push(mcpStdioTransport(rig));
+    if (flags.mcp) {
+      const onMcpClose = makeMcpCloseCallback(ctrl, stdioIsOnly, say);
+      servers.push(mcpStdioTransport(rig, onMcpClose));
+    }
     if (flags.mcpHttp) {
       servers.push(mcpHttpTransport(rig, flags.mcpHttp, flags.cors));
     }
@@ -189,11 +225,6 @@ export async function node(opts: {
   };
 
   let servers = await startOnce();
-
-  // Wire SIGINT once — closes the watcher (if any) and stops servers.
-  const ctrl = new AbortController();
-  const onSig = () => ctrl.abort();
-  Deno.addSignalListener("SIGINT", onSig);
 
   try {
     if (flags.watch) {
@@ -330,7 +361,10 @@ function grpcTransport(
   };
 }
 
-function mcpStdioTransport(rig: RigLike): TransportServer {
+function mcpStdioTransport(
+  rig: RigLike,
+  onClose?: () => void,
+): TransportServer {
   let transport: StdioServerTransport | null = null;
   return {
     transport: "mcp",
@@ -340,6 +374,15 @@ function mcpStdioTransport(rig: RigLike): TransportServer {
       const server = buildMcpServer(rig as any, mcpOpts());
       transport = new StdioServerTransport();
       await server.connect(transport);
+      // server.connect() wires transport.onclose → server.close().
+      // Chain our shutdown hook so stdin EOF propagates to the node controller.
+      if (onClose) {
+        const prev = transport.onclose;
+        transport.onclose = async () => {
+          await prev?.();
+          onClose();
+        };
+      }
     },
     async stop() {
       await transport?.close();
@@ -409,7 +452,7 @@ function mcpWsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
 }
 
 function mcpOpts(): McpServerOptions {
-  return { name: "bnd", version: "0.5.0", codec: mcpTextJsonStringify() };
+  return { name: "bnd", version: VERSION, codec: mcpTextJsonStringify() };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
