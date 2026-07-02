@@ -12,7 +12,8 @@
     "fmt:check": "deno fmt --check src/",
     "lint": "deno lint src/",
     "test": "deno test --allow-read --allow-write --allow-env --allow-net --allow-run src/",
-    "compile": "deno compile --allow-read --allow-write --allow-env --allow-net --output bnd src/main.ts"
+    "compile": "deno compile --allow-read --allow-write --allow-env --allow-net --output bnd src/main.ts",
+    "check:deps": "deno run --allow-read=deno.json --allow-net=jsr.io scripts/check-dep-drift.ts"
   },
   "imports": {
     "@bandeira-tech/b3nd-move/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/http/service",
