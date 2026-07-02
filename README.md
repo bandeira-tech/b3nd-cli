@@ -62,7 +62,7 @@ uses it.
 ```ts
 // b3nd.rig.ts
 import { connection, Rig } from "jsr:@bandeira-tech/b3nd-core@^0.24.0/rig";
-import { HttpClient } from "jsr:@bandeira-tech/b3nd-move@^0.19.0/http/client";
+import { HttpClient } from "jsr:@bandeira-tech/b3nd-move@^0.20.0/http/client";
 
 export default () => {
   const client = new HttpClient({ url: "https://node.example.com" });
