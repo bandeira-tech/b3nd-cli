@@ -1,10 +1,10 @@
 /**
- * Smoke tests — no rig required.
+ * Smoke tests — no rig required (except bnd-node-mcp-exit which uses TEST_RIG).
  * Verifies CLI entry points, help output, and argument-validation errors.
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { runBnd } from "./helpers.ts";
+import { DENO_DIR, MAIN, runBnd, TEST_RIG } from "./helpers.ts";
 
 // Use a non-existent HOME so no real config is ever read.
 const NO_RIG = { HOME: "/tmp/bnd-smoke-test-no-home" };
@@ -72,3 +72,61 @@ Deno.test("bnd status with no rig → exit 1, 'No rig' on stderr", async () => {
   assertEquals(code, 1);
   assertStringIncludes(stderr, "No rig");
 });
+
+// ── bnd node --mcp stdio exit ─────────────────────────────────────────────
+
+Deno.test(
+  "bnd node --mcp exits cleanly when stdin closes (MCP client disconnect)",
+  async () => {
+    // MCP hosts (Claude Code, etc.) terminate stdio servers by closing stdin,
+    // not by signalling the process group. Verify that the process exits with
+    // code 0 when its stdin is closed while stdio is the only transport.
+    const child = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        "--allow-net",
+        MAIN,
+        "node",
+        "--mcp",
+        "--rig",
+        TEST_RIG,
+      ],
+      env: { ...Deno.env.toObject(), DENO_DIR },
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "piped",
+    }).spawn();
+
+    // Wait for the ready signal ("✓ mcp        stdio") so we know the MCP
+    // server has connected to the stdio transport before we close stdin.
+    const rd = child.stderr.getReader();
+    const dec = new TextDecoder();
+    let stderrBuf = "";
+    while (!stderrBuf.includes("✓ mcp")) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      stderrBuf += dec.decode(value);
+    }
+    rd.releaseLock();
+
+    // Close stdin — this is how the MCP host signals it is done.
+    await child.stdin.close();
+
+    // The process should exit cleanly within a reasonable timeout.
+    const result = await Promise.race([
+      child.status,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("process did not exit within 5 s")),
+          5000,
+        )
+      ),
+    ]);
+
+    assertEquals(result.code, 0);
+  },
+  { sanitizeOps: false, sanitizeResources: false },
+);
