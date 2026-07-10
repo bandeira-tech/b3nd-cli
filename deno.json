@@ -1,6 +1,7 @@
 {
   "name": "@bandeira-tech/b3nd-cli",
-  "version": "0.5.0",
+  "version": "0.5.1",
+  "minimumDependencyAge": 0,
   "description": "B3nd CLI \u2014 `bnd` command-line tool. A thin framework runner that loads a user-defined rig module and uses it to send/receive/read/observe/serve. Protocol concerns (signing, envelope-building) live in your rig.",
   "exports": {
     ".": "./src/main.ts"
@@ -16,20 +17,20 @@
     "check:deps": "deno run --allow-read=deno.json --allow-net=jsr.io scripts/check-dep-drift.ts"
   },
   "imports": {
-    "@bandeira-tech/b3nd-move/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/http/service",
-    "@bandeira-tech/b3nd-move/ws/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/ws/service",
-    "@bandeira-tech/b3nd-move/grpc/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/grpc/http/service",
-    "@bandeira-tech/b3nd-move/mcp/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/mcp/service",
-    "@bandeira-tech/b3nd-move/mcp/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/mcp/http/service",
-    "@bandeira-tech/b3nd-move/mcp/ws/service": "jsr:@bandeira-tech/b3nd-move@^0.20.0/mcp/ws/service",
+    "@bandeira-tech/b3nd-move/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/http/service",
+    "@bandeira-tech/b3nd-move/ws/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/ws/service",
+    "@bandeira-tech/b3nd-move/grpc/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/grpc/http/service",
+    "@bandeira-tech/b3nd-move/mcp/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/mcp/service",
+    "@bandeira-tech/b3nd-move/mcp/http/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/mcp/http/service",
+    "@bandeira-tech/b3nd-move/mcp/ws/service": "jsr:@bandeira-tech/b3nd-move@^0.20.1/mcp/ws/service",
     "@modelcontextprotocol/sdk/server/stdio.js": "npm:@modelcontextprotocol/sdk@^1.0.0/server/stdio.js",
     "@std/path": "jsr:@std/path@1",
     "@std/fs": "jsr:@std/fs@1",
     "@std/assert": "jsr:@std/assert@1",
-    "@bandeira-tech/b3nd-move/codecs/http": "jsr:@bandeira-tech/b3nd-move@^0.20.0/codecs/http",
-    "@bandeira-tech/b3nd-move/codecs/ws": "jsr:@bandeira-tech/b3nd-move@^0.20.0/codecs/ws",
-    "@bandeira-tech/b3nd-move/codecs/grpc": "jsr:@bandeira-tech/b3nd-move@^0.20.0/codecs/grpc",
-    "@bandeira-tech/b3nd-move/codecs/mcp": "jsr:@bandeira-tech/b3nd-move@^0.20.0/codecs/mcp"
+    "@bandeira-tech/b3nd-move/codecs/http": "jsr:@bandeira-tech/b3nd-move@^0.20.1/codecs/http",
+    "@bandeira-tech/b3nd-move/codecs/ws": "jsr:@bandeira-tech/b3nd-move@^0.20.1/codecs/ws",
+    "@bandeira-tech/b3nd-move/codecs/grpc": "jsr:@bandeira-tech/b3nd-move@^0.20.1/codecs/grpc",
+    "@bandeira-tech/b3nd-move/codecs/mcp": "jsr:@bandeira-tech/b3nd-move@^0.20.1/codecs/mcp"
   },
   "compilerOptions": {
     "strict": true,
