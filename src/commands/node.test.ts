@@ -1,5 +1,39 @@
 import { assertEquals } from "@std/assert";
-import { parseAddr, parseNodeFlags } from "./node.ts";
+import {
+  DEFAULT_HOST,
+  isLoopback,
+  parseAddr,
+  parseNodeFlags,
+  resolveHostname,
+} from "./node.ts";
+
+// ── secure-by-default host policy ────────────────────────────────────────
+
+Deno.test("DEFAULT_HOST is loopback", () => {
+  assertEquals(DEFAULT_HOST, "127.0.0.1");
+  assertEquals(isLoopback(DEFAULT_HOST), true);
+});
+
+Deno.test("resolveHostname: unspecified host → secure default (localhost)", () => {
+  assertEquals(resolveHostname({ port: 3000 }), "127.0.0.1");
+});
+
+Deno.test("resolveHostname: explicit host passes through (opt-in to exposure)", () => {
+  assertEquals(resolveHostname({ hostname: "0.0.0.0", port: 3000 }), "0.0.0.0");
+  assertEquals(
+    resolveHostname({ hostname: "192.168.1.5", port: 3000 }),
+    "192.168.1.5",
+  );
+});
+
+Deno.test("isLoopback: recognises loopback forms, rejects exposed hosts", () => {
+  for (const h of ["127.0.0.1", "::1", "[::1]", "localhost"]) {
+    assertEquals(isLoopback(h), true, h);
+  }
+  for (const h of ["0.0.0.0", "192.168.1.5", "10.0.0.2", ""]) {
+    assertEquals(isLoopback(h), false, h);
+  }
+});
 
 // ── parseAddr ────────────────────────────────────────────────────────────
 

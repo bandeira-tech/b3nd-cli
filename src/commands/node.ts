@@ -15,6 +15,12 @@
  *   bnd node --cors '*'                   # CORS wrapper for HTTP-speaking transports
  *   bnd node --watch                      # restart on rig file change
  *
+ * Secure by default: bare `--http` / `--http=PORT` binds to loopback
+ * (127.0.0.1) and is unreachable from other machines. Exposing a rig to
+ * the network is an explicit act — give a host, e.g. `--http=0.0.0.0:PORT`
+ * (all interfaces) or `--http=192.168.1.5:PORT` (a specific interface).
+ * A non-loopback bind prints a warning at startup.
+ *
  * The `--rig <path|url>` flag and the optional positional rig path
  * follow the universal resolution rule: explicit > project file > config.
  *
@@ -51,6 +57,25 @@ interface AddrFlag {
   hostname?: string;
 }
 
+/**
+ * Secure-by-default bind host. When the user names no host (`--http`,
+ * `--http=PORT`), transports bind here — loopback only, unreachable from
+ * other machines. Reaching a rig from the network requires an explicit
+ * host (e.g. `--http=0.0.0.0:PORT`).
+ */
+export const DEFAULT_HOST = "127.0.0.1";
+
+/** Apply the secure default when the user didn't name a host. */
+export function resolveHostname(addr: AddrFlag): string {
+  return addr.hostname ?? DEFAULT_HOST;
+}
+
+/** Loopback hosts are local-only — not exposed to the network. */
+export function isLoopback(hostname: string): boolean {
+  return hostname === "127.0.0.1" || hostname === "::1" ||
+    hostname === "[::1]" || hostname === "localhost";
+}
+
 interface NodeFlags {
   http?: AddrFlag;
   ws?: AddrFlag;
@@ -65,6 +90,8 @@ interface NodeFlags {
 interface TransportServer {
   readonly transport: string;
   readonly address: string;
+  /** Bound host for network transports; undefined for stdio. */
+  readonly hostname?: string;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -184,7 +211,15 @@ export async function node(opts: {
     });
     const servers = buildServers(rig);
     await Promise.all(servers.map((s) => s.start()));
-    for (const s of servers) say(`✓ ${s.transport.padEnd(10)} ${s.address}`);
+    for (const s of servers) {
+      say(`✓ ${s.transport.padEnd(10)} ${s.address}`);
+      if (s.hostname && !isLoopback(s.hostname)) {
+        say(
+          `  ! ${s.transport} is exposed on ${s.hostname} — ` +
+            `reachable from other machines on your network`,
+        );
+      }
+    }
     return servers;
   };
 
@@ -248,7 +283,7 @@ function httpTransport(
   cors: string | undefined,
 ): TransportServer {
   const port = addr.port;
-  const hostname = addr.hostname ?? "0.0.0.0";
+  const hostname = resolveHostname(addr);
   const handler = withCors(
     // deno-lint-ignore no-explicit-any
     httpApi(rig as any, { codec: httpOutputsFrame() }),
@@ -257,6 +292,7 @@ function httpTransport(
   let server: Deno.HttpServer | null = null;
   return {
     transport: "http",
+    hostname,
     address: `http://${hostname}:${port}`,
     start() {
       server = Deno.serve({ port, hostname }, handler);
@@ -271,7 +307,7 @@ function httpTransport(
 
 function wsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
   const port = addr.port;
-  const hostname = addr.hostname ?? "0.0.0.0";
+  const hostname = resolveHostname(addr);
   // deno-lint-ignore no-explicit-any
   const attach = wsApi(rig as any, { codec: wsJsonEnvelope() });
   const sockets = new Set<WebSocket>();
@@ -290,6 +326,7 @@ function wsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
   let server: Deno.HttpServer | null = null;
   return {
     transport: "ws",
+    hostname,
     address: `ws://${hostname}:${port}`,
     start() {
       server = Deno.serve({ port, hostname }, handler);
@@ -309,7 +346,7 @@ function grpcTransport(
   cors: string | undefined,
 ): TransportServer {
   const port = addr.port;
-  const hostname = addr.hostname ?? "0.0.0.0";
+  const hostname = resolveHostname(addr);
   const handler = withCors(
     // deno-lint-ignore no-explicit-any
     grpcHttpApi(rig as any, { codec: grpcProto() }),
@@ -318,6 +355,7 @@ function grpcTransport(
   let server: Deno.HttpServer | null = null;
   return {
     transport: "grpc",
+    hostname,
     address: `http://${hostname}:${port}`,
     start() {
       server = Deno.serve({ port, hostname }, handler);
@@ -354,12 +392,13 @@ function mcpHttpTransport(
   cors: string | undefined,
 ): TransportServer {
   const port = addr.port;
-  const hostname = addr.hostname ?? "0.0.0.0";
+  const hostname = resolveHostname(addr);
   // deno-lint-ignore no-explicit-any
   const handler = withCors(mcpHttpApi(rig as any, mcpOpts()), cors);
   let server: Deno.HttpServer | null = null;
   return {
     transport: "mcp-http",
+    hostname,
     address: `http://${hostname}:${port}`,
     start() {
       server = Deno.serve({ port, hostname }, handler);
@@ -374,7 +413,7 @@ function mcpHttpTransport(
 
 function mcpWsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
   const port = addr.port;
-  const hostname = addr.hostname ?? "0.0.0.0";
+  const hostname = resolveHostname(addr);
   // deno-lint-ignore no-explicit-any
   const attach = mcpWsApi(rig as any, mcpOpts());
   const sockets = new Set<WebSocket>();
@@ -395,6 +434,7 @@ function mcpWsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
   let server: Deno.HttpServer | null = null;
   return {
     transport: "mcp-ws",
+    hostname,
     address: `ws://${hostname}:${port}`,
     start() {
       server = Deno.serve({ port, hostname }, handler);
