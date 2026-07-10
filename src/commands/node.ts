@@ -40,6 +40,10 @@ import { createLogger } from "../logger.ts";
 import { httpApi } from "@bandeira-tech/b3nd-move/http/service";
 import { wsApi } from "@bandeira-tech/b3nd-move/ws/service";
 import { grpcHttpApi } from "@bandeira-tech/b3nd-move/grpc/http/service";
+import { httpOutputsFrame } from "@bandeira-tech/b3nd-move/codecs/http";
+import { wsJsonEnvelope } from "@bandeira-tech/b3nd-move/codecs/ws";
+import { grpcProto } from "@bandeira-tech/b3nd-move/codecs/grpc";
+import { mcpTextJsonStringify } from "@bandeira-tech/b3nd-move/codecs/mcp";
 import {
   buildMcpServer,
   type McpServerOptions,
@@ -280,8 +284,11 @@ function httpTransport(
 ): TransportServer {
   const port = addr.port;
   const hostname = resolveHostname(addr);
-  // deno-lint-ignore no-explicit-any
-  const handler = withCors(httpApi(rig as any), cors);
+  const handler = withCors(
+    // deno-lint-ignore no-explicit-any
+    httpApi(rig as any, { codec: httpOutputsFrame() }),
+    cors,
+  );
   let server: Deno.HttpServer | null = null;
   return {
     transport: "http",
@@ -302,7 +309,7 @@ function wsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
   const port = addr.port;
   const hostname = resolveHostname(addr);
   // deno-lint-ignore no-explicit-any
-  const attach = wsApi(rig as any);
+  const attach = wsApi(rig as any, { codec: wsJsonEnvelope() });
   const sockets = new Set<WebSocket>();
   const handler = (req: Request): Response => {
     if (req.headers.get("upgrade") !== "websocket") {
@@ -340,8 +347,11 @@ function grpcTransport(
 ): TransportServer {
   const port = addr.port;
   const hostname = resolveHostname(addr);
-  // deno-lint-ignore no-explicit-any
-  const handler = withCors(grpcHttpApi(rig as any), cors);
+  const handler = withCors(
+    // deno-lint-ignore no-explicit-any
+    grpcHttpApi(rig as any, { codec: grpcProto() }),
+    cors,
+  );
   let server: Deno.HttpServer | null = null;
   return {
     transport: "grpc",
@@ -439,7 +449,7 @@ function mcpWsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
 }
 
 function mcpOpts(): McpServerOptions {
-  return { name: "bnd", version: "0.5.0" };
+  return { name: "bnd", version: "0.5.0", codec: mcpTextJsonStringify() };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
