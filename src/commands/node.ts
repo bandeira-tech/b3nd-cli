@@ -449,7 +449,7 @@ function mcpWsTransport(rig: RigLike, addr: AddrFlag): TransportServer {
 }
 
 function mcpOpts(): McpServerOptions {
-  return { name: "bnd", version: "0.5.0", codec: mcpTextJsonStringify() };
+  return { name: "bnd", version: "0.6.0", codec: mcpTextJsonStringify() };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────

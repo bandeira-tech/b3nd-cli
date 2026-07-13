@@ -167,10 +167,11 @@ transports can be stacked on a single invocation and each is bound to its own
 port (or stdio, for `--mcp`).
 
 ```bash
-bnd node                       # default: --http on :3000
+bnd node                       # default: --http on 127.0.0.1:3000
 bnd node ./my-rig.ts           # explicit rig
-bnd node --http=4000           # custom port
-bnd node --http=0.0.0.0:4000   # bind hostname:port
+bnd node --http=4000           # custom port (still loopback-only)
+bnd node --http=0.0.0.0:4000   # expose on all interfaces (opt-in)
+bnd node --http=100.64.0.1:4000 # expose on one interface (e.g. a VPN)
 bnd node --ws                  # WebSocket on :8080
 bnd node --grpc                # gRPC-HTTP on :50051
 bnd node --mcp                 # MCP over stdio
@@ -180,6 +181,12 @@ bnd node --http --ws --mcp     # mix and match
 bnd node --cors '*'            # CORS for HTTP-speaking transports
 bnd node --watch               # restart on rig file change
 ```
+
+**Secure by default:** transports bind to loopback (`127.0.0.1`) unless you
+name a host. A bare `--http` / `--http=PORT` is unreachable from other
+machines; exposing a rig to the network is an explicit act — pass a host
+(`--http=0.0.0.0:PORT` for all interfaces, or a specific interface IP). A
+non-loopback bind prints a warning at startup.
 
 When `--mcp` is set, stdout is reserved for MCP JSON-RPC; bnd's status output
 goes to stderr (this is true for every command — `stdout = data`,
