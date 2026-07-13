@@ -1,6 +1,6 @@
 {
   "name": "@bandeira-tech/b3nd-cli",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "minimumDependencyAge": 0,
   "description": "B3nd CLI \u2014 `bnd` command-line tool. A thin framework runner that loads a user-defined rig module and uses it to send/receive/read/observe/serve. Protocol concerns (signing, envelope-building) live in your rig.",
   "exports": {
